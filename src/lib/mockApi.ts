@@ -1,5 +1,5 @@
-// src/lib/mockApi.ts
-// Mock API implementation for RentTrack (improved)
+﻿// src/lib/mockApi.ts
+// Robust mockApi (fixed syntax)
 
 import {
   demoUser,
@@ -10,145 +10,91 @@ import {
   mockActivities,
   exampleParsedOCR,
   uploadStore as importedUploadStore,
-  type User,
-  type Tenant,
-  type Payment,
-  type Property,
-  type Upload,
-  type ParsedOCRData,
 } from './mockData';
 
-// If imported uploadStore isn't present, create our own Map
-const uploadStore: Map<string, Upload> = importedUploadStore || new Map();
-
-// Simulate network delay
-const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Generate random ID
-const generateId = () => Math.random().toString(36).substring(2, 9);
-
-// Helper to create token for role
-const makeToken = (role = 'ADMIN') => `${role.toLowerCase()}-token-${generateId()}`;
-
-// Map demo emails to roles
-const roleForEmail = (email: string) => {
-  const e = (email || '').toLowerCase();
+const uploadStore = importedUploadStore || new Map();
+const delay = (ms = 500) => new Promise((r) => setTimeout(r, ms));
+const gen = () => Math.random().toString(36).substring(2, 9);
+const maketoken = (role = 'ADMIN') => `${role.toLowerCase()}-token-${gen()}`;
+const roleForEmail = (e: string | undefined) => {
+  e = (e || '').toLowerCase();
   if (e === 'landlord@renttrack.local') return 'LANDLORD';
   if (e === 'tenant@renttrack.local') return 'TENANT';
   return 'ADMIN';
 };
 
-// Helper to clone arrays to avoid accidental mutation
-const clone = <T,>(arr: T[]) => arr.map(x => ({ ...x }));
-
 export const mockApi = {
-  // Auth
-  async login(email: string, password: string): Promise<{ token: string; user: User }> {
+  async login(email: string, password: string) {
     await delay(700);
-
-    // Accept demo credentials or any email with demo123 for convenience
     if (password === 'demo123') {
       const role = roleForEmail(email);
-      const token = makeToken(role);
-      // Build user object based on role
-      const user: User = {
-        id: `${role.toLowerCase()}-${generateId()}`,
-        name: role === 'ADMIN' ? demoUser.name : role === 'LANDLORD' ? 'Demo Landlord' : 'Demo Tenant',
+      const token = maketoken(role);
+      const user = {
+        id: role.toLowerCase() + '-' + gen(),
+        name: role === 'ADMIN' ? 'Demo Admin' : role === 'LANDLORD' ? 'Demo Landlord' : 'Demo Tenant',
         email,
         role,
-      } as User;
-
+      };
       return { token, user };
     }
-
     throw new Error('Invalid credentials');
   },
 
-  async forgotPassword(email: string): Promise<{ ok: boolean }> {
+  async forgotPassword(email: string) {
     await delay(400);
-    // always succeed in mock
     return { ok: true };
   },
 
-  async getCurrentUser(): Promise<User> {
+  async getCurrentUser() {
     await delay(250);
     const token = localStorage.getItem('renttrack_token') || localStorage.getItem('token') || '';
     if (!token) throw new Error('Not authenticated');
-
-    // simple role detection from token prefix
-    if (token.startsWith('landlord-token')) {
-      return { id: `landlord-${generateId()}`, name: 'Demo Landlord', email: 'landlord@renttrack.local', role: 'LANDLORD' } as User;
-    }
-    if (token.startsWith('tenant-token')) {
-      return { id: `tenant-${generateId()}`, name: 'Demo Tenant', email: 'tenant@renttrack.local', role: 'TENANT' } as User;
-    }
-    // default admin
-    return { id: `admin-${generateId()}`, name: demoUser.name, email: demoUser.email, role: 'ADMIN' } as User;
+    if (token.startsWith('landlord-token')) return { id: 'landlord-' + gen(), name: 'Demo Landlord', email: 'landlord@renttrack.local', role: 'LANDLORD' };
+    if (token.startsWith('tenant-token')) return { id: 'tenant-' + gen(), name: 'Demo Tenant', email: 'tenant@renttrack.local', role: 'TENANT' };
+    return { id: 'admin-' + gen(), name: demoUser.name, email: demoUser.email, role: 'ADMIN' };
   },
 
-  // Uploads & OCR
-  async uploadFile(file: File): Promise<{ uploadId: string }> {
+  async uploadFile(file: File) {
     await delay(800);
-
-    const uploadId = 'mock-upload-' + generateId();
-    const upload: Upload = {
-      id: uploadId,
-      filename: file.name,
-      fileType: file.type,
-      fileSize: file.size,
-      uploadedAt: new Date().toISOString(),
-      status: 'processing',
-      previewUrl: URL.createObjectURL(file),
-    };
-
-    uploadStore.set(uploadId, upload);
-
-    // Simulate OCR processing after 3-6 seconds
+    const uploadId = 'mock-upload-' + gen();
+    const u = { id: uploadId, filename: file.name, fileType: file.type, fileSize: file.size, uploadedAt: new Date().toISOString(), status: 'processing', previewUrl: URL.createObjectURL(file) };
+    uploadStore.set(uploadId, u);
     setTimeout(() => {
-      const stored = uploadStore.get(uploadId);
-      if (stored) {
-        stored.status = 'completed';
-        stored.parsedJson = { ...exampleParsedOCR } as ParsedOCRData;
-        // small variation: add id references to parsed data
-        stored.parsedJson._uploadId = uploadId;
-        uploadStore.set(uploadId, stored);
+      const s = uploadStore.get(uploadId);
+      if (s) {
+        s.status = 'completed';
+        s.parsedJson = { ...exampleParsedOCR, _uploadId: uploadId };
+        uploadStore.set(uploadId, s);
       }
     }, 3000 + Math.random() * 3000);
-
     return { uploadId };
   },
 
-  async getUploadParsed(uploadId: string): Promise<Upload | null> {
+  async getUploadParsed(uploadId: string) {
     await delay(350);
-    const upload = uploadStore.get(uploadId);
-    if (!upload) {
-      throw new Error('Upload not found');
-    }
-    return upload;
+    const u = uploadStore.get(uploadId);
+    if (!u) throw new Error('Upload not found');
+    return u;
   },
 
-  // Tenants
-  async getTenants(): Promise<Tenant[]> {
+  async getTenants() {
     await delay(450);
-    return clone(mockTenants);
+    return mockTenants.map((x) => ({ ...x }));
   },
-
-  async getTenant(id: string): Promise<Tenant | null> {
+  async getTenant(id: string) {
     await delay(300);
-    return mockTenants.find(t => t.id === id) || null;
+    return mockTenants.find((t) => t.id === id) || null;
   },
-
-  async createTenant(data: Partial<Tenant>): Promise<Tenant> {
+  async createTenant(data: any) {
     await delay(700);
-
-    const newTenant: Tenant = {
-      id: 'tenant-' + generateId(),
+    const t = {
+      id: 'tenant-' + gen(),
       name: data.name || '',
       email: data.email || '',
       phone: data.phone || '',
-      govtId: (data as any).govtId || data.govtId || '',
+      govtId: data.govtId || '',
       address: data.address || '',
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${generateId()}`,
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + gen(),
       propertyId: data.propertyId || '',
       propertyName: data.propertyName || '',
       rentAmount: Number(data.rentAmount || 0),
@@ -158,81 +104,48 @@ export const mockApi = {
       status: 'active',
       createdAt: new Date().toISOString(),
     };
-
-    mockTenants.push(newTenant);
-    return newTenant;
+    mockTenants.push(t);
+    return t;
   },
 
-  // Properties
-  async getProperties(): Promise<Property[]> {
+  async getProperties() {
     await delay(400);
-    return clone(mockProperties);
+    return mockProperties.map((x) => ({ ...x }));
   },
-
-  async getProperty(id: string): Promise<Property | null> {
+  async getProperty(id: string) {
     await delay(300);
-    return mockProperties.find(p => p.id === id) || null;
+    return mockProperties.find((p) => p.id === id) || null;
   },
-
-  async createProperty(data: Partial<Property>): Promise<Property> {
+  async createProperty(data: any) {
     await delay(600);
-    const newProperty: Property = {
-      id: 'prop-' + generateId(),
-      title: data.title || 'Untitled Property',
-      address: data.address || '',
-      bhk: Number((data as any).bhk || 1),
-      price: Number((data as any).price || 0),
-      images: (data as any).images || [],
-      tags: (data as any).tags || [],
-      available: typeof (data as any).available === 'boolean' ? (data as any).available : true,
-      createdAt: new Date().toISOString(),
-    } as Property;
-
-    mockProperties.push(newProperty);
-    return newProperty;
+    const p = { id: 'prop-' + gen(), title: data.title || 'Untitled', address: data.address || '', bhk: Number(data.bhk || 1), price: Number(data.price || 0), images: data.images || [], tags: data.tags || [], available: true, createdAt: new Date().toISOString() };
+    mockProperties.push(p);
+    return p;
   },
 
-  // Payments
-  async getPayments(): Promise<Payment[]> {
+  async getPayments() {
     await delay(450);
-    return clone(mockPayments);
+    return mockPayments.map((x) => ({ ...x }));
   },
-
-  async getTenantLedger(tenantId: string): Promise<Payment[]> {
+  async getTenantLedger(tenantId: string) {
     await delay(400);
-    return mockPayments.filter(p => p.tenantId === tenantId);
+    return mockPayments.filter((p) => p.tenantId === tenantId);
   },
-
-  async markPaymentPaid(paymentId: string, data: { method: string; paidDate: string }): Promise<Payment> {
+  async markPaymentPaid(paymentId: string, data: any) {
     await delay(500);
-
-    const payment = mockPayments.find(p => p.id === paymentId);
-    if (!payment) {
-      throw new Error('Payment not found');
-    }
-
-    payment.status = 'paid';
-    payment.paidDate = data.paidDate;
-    payment.method = data.method;
-    return payment;
+    const pay = mockPayments.find((p) => p.id === paymentId);
+    if (!pay) throw new Error('Payment not found');
+    pay.status = 'paid';
+    pay.paidDate = data.paidDate;
+    pay.method = data.method;
+    return pay;
   },
-
-  async recordManualPayment(data: {
-    tenantId: string;
-    amount: number;
-    date: string;
-    method: string;
-    receiptUrl?: string;
-  }): Promise<Payment> {
+  async recordManualPayment(data: any) {
     await delay(600);
-
-    const tenant = mockTenants.find(t => t.id === data.tenantId);
-    if (!tenant) {
-      throw new Error('Tenant not found');
-    }
-
-    const newPayment: Payment = {
-      id: 'pay-' + generateId(),
+    const tenant = mockTenants.find((t) => t.id === data.tenantId);
+    if (!tenant) throw new Error('Tenant not found');
+    const np = {
+      id: 'pay-' + gen(),
       tenantId: data.tenantId,
       tenantName: tenant.name,
       propertyId: tenant.propertyId,
@@ -244,88 +157,60 @@ export const mockApi = {
       method: data.method,
       receiptUrl: data.receiptUrl,
     };
-
-    mockPayments.push(newPayment);
-    return newPayment;
+    mockPayments.push(np);
+    return np;
   },
 
-  // Dashboard
-  async getDashboardStats(): Promise<{
-    totalTenants: number;
-    overdue: number;
-    nextDueDate: string;
-    totalRevenue: number;
-  }> {
+  async getDashboardStats() {
     await delay(300);
-
-    const overdue = mockPayments.filter(p => p.status === 'overdue').length;
-    const nextDue = mockPayments
-      .filter(p => p.status === 'due')
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
-
-    const totalRevenue = mockPayments
-      .filter(p => p.status === 'paid')
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-    return {
-      totalTenants: mockTenants.length,
-      overdue,
-      nextDueDate: nextDue?.dueDate || 'N/A',
-      totalRevenue,
-    };
+    const overdue = mockPayments.filter((p) => p.status === 'overdue').length;
+    const nextDue = mockPayments.filter((p) => p.status === 'due').sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+    const totalRevenue = mockPayments.filter((p) => p.status === 'paid').reduce((s, p) => s + (p.amount || 0), 0);
+    return { totalTenants: mockTenants.length, overdue, nextDueDate: nextDue?.dueDate || 'N/A', totalRevenue };
   },
 
-  async getRecentActivity(): Promise<typeof mockActivities> {
+  async getRecentActivity() {
     await delay(250);
-    return clone(mockActivities);
+    return mockActivities.map((x) => ({ ...x }));
   },
 
-  // Users (for settings)
-  async getUsers(): Promise<User[]> {
+  async getUsers() {
     await delay(350);
-    return clone(mockUsers);
+    return mockUsers.map((x) => ({ ...x }));
   },
 
-  // Settings
-  async getSettings(): Promise<{ ocrAccuracy: number }> {
+  async getSettings() {
     await delay(200);
-    const settings = localStorage.getItem('renttrack_settings');
-    return settings ? JSON.parse(settings) : { ocrAccuracy: 0.8 };
+    const s = localStorage.getItem('renttrack_settings');
+    return s ? JSON.parse(s) : { ocrAccuracy: 0.8 };
   },
-
-  async updateSettings(data: { ocrAccuracy: number }): Promise<{ ok: boolean }> {
+  async updateSettings(data: any) {
     await delay(250);
     localStorage.setItem('renttrack_settings', JSON.stringify(data));
     return { ok: true };
   },
-
-  async reprocessFailedOCR(): Promise<{ processed: number }> {
+  async reprocessFailedOCR() {
     await delay(1200);
-    // simulate processing 2-4 items
     return { processed: Math.floor(2 + Math.random() * 3) };
   },
 
-  // CSV Export (mock)
-  async exportTenantsCSV(): Promise<Blob> {
+  async exportTenantsCSV() {
     await delay(300);
-    const csv = 'Name,Email,Phone,Property,Rent,Status\n' +
-      mockTenants.map(t =>
-        `"${t.name}","${t.email}","${t.phone}","${t.propertyName}",${t.rentAmount},"${t.status}"`
-      ).join('\n');
+    const header = ['Name', 'Email', 'Phone', 'Property', 'Rent', 'Status'];
+    const rows = mockTenants.map((t) => [t.name, t.email, t.phone, t.propertyName || '', String(t.rentAmount || ''), t.status || ''].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','));
+    const csv = header.join(',') + '\n' + rows.join('\n');
     return new Blob([csv], { type: 'text/csv' });
   },
 
-  async exportPaymentsCSV(): Promise<Blob> {
+  async exportPaymentsCSV() {
     await delay(300);
-    const csv = 'Tenant,Month,Amount,Due Date,Status,Paid Date\n' +
-      mockPayments.map(p =>
-        `"${p.tenantName}","${p.month}",${p.amount},"${p.dueDate}","${p.status}","${p.paidDate || ''}"`
-      ).join('\n');
+    const header = ['Tenant', 'Month', 'Amount', 'Due Date', 'Status', 'Paid Date'];
+    const rows = mockPayments.map((p) => [p.tenantName, p.month, String(p.amount), p.dueDate, p.status, p.paidDate || ''].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','));
+    const csv = header.join(',') + '\n' + rows.join('\n');
     return new Blob([csv], { type: 'text/csv' });
   },
 };
 
-// Helper example to trigger download client-side (not part of API object)
 export function downloadBlob(blob: Blob, filename = 'export.csv') {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

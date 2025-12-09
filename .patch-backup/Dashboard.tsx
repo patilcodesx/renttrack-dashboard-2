@@ -11,8 +11,7 @@ import {
   ArrowRight,
   Activity,
 } from 'lucide-react';
-import apiClient from '@/lib/apiClient';
-import { StatCard, StatCardSkeleton } from '@/components/ui/StatCard';
+import apiClient from import { StatCard, StatCardSkeleton } from '@/components/ui/StatCard';
 import { cn } from '@/lib/utils';
 import { getRole } from '@/lib/auth';
 
@@ -69,7 +68,8 @@ export default function Dashboard() {
           </>
         ) : stats ? (
           <>
-                   <StatCard title='Overdue Payments' value={stats.overdue} icon={AlertTriangle} />
+            <StatCard title='Total Tenants' value={stats.totalTenants} icon={Users} />
+            <StatCard title='Overdue Payments' value={stats.overdue} icon={AlertTriangle} />
             <StatCard title='Next Due Date' value={formatDate(stats.nextDueDate)} icon={Calendar} />
             <StatCard title='Total Revenue' value={$} icon={DollarSign} />
           </>
