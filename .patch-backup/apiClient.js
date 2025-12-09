@@ -1,28 +1,117 @@
-﻿import { mockApi } from './mockApi';
-const useMock = (import.meta.env.VITE_USE_MOCK === 'true') || (import.meta.env.VITE_USE_MOCK === true) || (localStorage.getItem('USE_MOCK') === 'true');
+﻿// src/lib/apiClient.js
+// Unified API client - exports both named `apiClient` and default
 
-const client = {
-  async login(email,password){ if(useMock) return mockApi.login(email,password); throw new Error('No backend'); },
-  async forgotPassword(email){ if(useMock) return mockApi.forgotPassword(email); throw new Error('No backend'); },
-  async getCurrentUser(){ if(useMock) return mockApi.getCurrentUser(); throw new Error('No backend'); },
-  async uploadFile(file){ if(useMock) return mockApi.uploadFile(file); throw new Error('No backend'); },
-  async getUploadParsed(id){ if(useMock) return mockApi.getUploadParsed(id); throw new Error('No backend'); },
-  async getTenants(){ if(useMock) return mockApi.getTenants(); throw new Error('No backend'); },
-  async getTenant(id){ if(useMock) return mockApi.getTenant(id); throw new Error('No backend'); },
-  async createTenant(data){ if(useMock) return mockApi.createTenant(data); throw new Error('No backend'); },
-  async getProperties(){ if(useMock) return mockApi.getProperties(); throw new Error('No backend'); },
-  async getProperty(id){ if(useMock) return mockApi.getProperty(id); throw new Error('No backend'); },
-  async createProperty(data){ if(useMock) return mockApi.createProperty(data); throw new Error('No backend'); },
-  async getPayments(){ if(useMock) return mockApi.getPayments(); throw new Error('No backend'); },
-  async markPaymentPaid(id,data){ if(useMock) return mockApi.markPaymentPaid(id,data); throw new Error('No backend'); },
-  async recordManualPayment(data){ if(useMock) return mockApi.recordManualPayment(data); throw new Error('No backend'); },
-  async getDashboardStats(){ if(useMock) return mockApi.getDashboardStats(); throw new Error('No backend'); },
-  async getRecentActivity(){ if(useMock) return mockApi.getRecentActivity(); throw new Error('No backend'); },
-  async getUsers(){ if(useMock) return mockApi.getUsers(); throw new Error('No backend'); },
-  async getSettings(){ if(useMock) return mockApi.getSettings(); throw new Error('No backend'); },
-  async updateSettings(data){ if(useMock) return mockApi.updateSettings(data); throw new Error('No backend'); },
-  async exportTenantsCSV(){ if(useMock) return mockApi.exportTenantsCSV(); throw new Error('No backend'); },
-  async exportPaymentsCSV(){ if(useMock) return mockApi.exportPaymentsCSV(); throw new Error('No backend'); }
+import { mockApi } from './mockApi';
+
+const useMock =
+  import.meta.env.VITE_USE_MOCK === 'true' ||
+  import.meta.env.VITE_USE_MOCK === true ||
+  localStorage.getItem('USE_MOCK') === 'true';
+
+// Thin wrapper that either calls mockApi or throws (for real backend)
+const clientImpl = {
+  // Auth
+  async login(email, password) {
+    if (useMock) return mockApi.login(email, password);
+    throw new Error('No backend available: login');
+  },
+  async forgotPassword(email) {
+    if (useMock) return mockApi.forgotPassword(email);
+    throw new Error('No backend available: forgotPassword');
+  },
+  async getCurrentUser() {
+    if (useMock) return mockApi.getCurrentUser();
+    throw new Error('No backend available: getCurrentUser');
+  },
+
+  // Uploads & OCR
+  async uploadFile(file) {
+    if (useMock) return mockApi.uploadFile(file);
+    throw new Error('No backend available: uploadFile');
+  },
+  async getUploadParsed(id) {
+    if (useMock) return mockApi.getUploadParsed(id);
+    throw new Error('No backend available: getUploadParsed');
+  },
+
+  // Tenants
+  async getTenants() {
+    if (useMock) return mockApi.getTenants();
+    throw new Error('No backend available: getTenants');
+  },
+  async getTenant(id) {
+    if (useMock) return mockApi.getTenant(id);
+    throw new Error('No backend available: getTenant');
+  },
+  async createTenant(data) {
+    if (useMock) return mockApi.createTenant(data);
+    throw new Error('No backend available: createTenant');
+  },
+
+  // Properties
+  async getProperties() {
+    if (useMock) return mockApi.getProperties();
+    throw new Error('No backend available: getProperties');
+  },
+  async getProperty(id) {
+    if (useMock) return mockApi.getProperty(id);
+    throw new Error('No backend available: getProperty');
+  },
+  async createProperty(data) {
+    if (useMock) return mockApi.createProperty(data);
+    throw new Error('No backend available: createProperty');
+  },
+
+  // Payments
+  async getPayments() {
+    if (useMock) return mockApi.getPayments();
+    throw new Error('No backend available: getPayments');
+  },
+  async getTenantLedger(tenantId) {
+    if (useMock) return mockApi.getTenantLedger(tenantId);
+    throw new Error('No backend available: getTenantLedger');
+  },
+  async markPaymentPaid(id, data) {
+    if (useMock) return mockApi.markPaymentPaid(id, data);
+    throw new Error('No backend available: markPaymentPaid');
+  },
+  async recordManualPayment(data) {
+    if (useMock) return mockApi.recordManualPayment(data);
+    throw new Error('No backend available: recordManualPayment');
+  },
+
+  // Dashboard & activity
+  async getDashboardStats() {
+    if (useMock) return mockApi.getDashboardStats();
+    throw new Error('No backend available: getDashboardStats');
+  },
+  async getRecentActivity() {
+    if (useMock) return mockApi.getRecentActivity();
+    throw new Error('No backend available: getRecentActivity');
+  },
+
+  // Admin / settings / export
+  async getUsers() {
+    if (useMock) return mockApi.getUsers();
+    throw new Error('No backend available: getUsers');
+  },
+  async getSettings() {
+    if (useMock) return mockApi.getSettings();
+    throw new Error('No backend available: getSettings');
+  },
+  async updateSettings(data) {
+    if (useMock) return mockApi.updateSettings(data);
+    throw new Error('No backend available: updateSettings');
+  },
+  async exportTenantsCSV() {
+    if (useMock) return mockApi.exportTenantsCSV();
+    throw new Error('No backend available: exportTenantsCSV');
+  },
+  async exportPaymentsCSV() {
+    if (useMock) return mockApi.exportPaymentsCSV();
+    throw new Error('No backend available: exportPaymentsCSV');
+  },
 };
 
-export default client;
+export const apiClient = clientImpl; // named export
+export default apiClient; // default export for code that expects default

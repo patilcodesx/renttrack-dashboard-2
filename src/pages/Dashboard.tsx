@@ -16,50 +16,71 @@ import { StatCard, StatCardSkeleton } from '@/components/ui/StatCard';
 import { cn } from '@/lib/utils';
 import { getRole } from '@/lib/auth';
 
+type DashboardStats = {
+  overdue: number | string;
+  nextDueDate?: string | null;
+  totalRevenue?: number | string;
+};
+
+type ActivityItem = {
+  id: string | number;
+  message: string;
+  timestamp: string; // ISO string
+};
+
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [activities, setActivities] = useState([]);
+  // Removed the compatibility shim — not needed in React/TSX and it caused parse errors.
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const role = getRole();
   const nav = useNavigate();
 
   useEffect(() => {
+    let mounted = true;
     const fetchData = async () => {
       try {
         const [statsData, activitiesData] = await Promise.all([
           apiClient.getDashboardStats(),
           apiClient.getRecentActivity(),
         ]);
-        setStats(statsData);
-        setActivities(activitiesData);
+        if (!mounted) return;
+        setStats(statsData ?? null);
+        setActivities(Array.isArray(activitiesData) ? activitiesData : []);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch dashboard data', err);
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     };
     fetchData();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const formatDate = (s) => s === 'N/A' ? 'N/A' : new Date(s).toLocaleDateString();
-  const formatTime = (ts) => {
+  const formatDate = (s?: string | null) =>
+    !s || s === 'N/A' ? 'N/A' : new Date(s).toLocaleDateString();
+
+  const formatTime = (ts?: string) => {
+    if (!ts) return '';
     const d = new Date(ts);
     const now = new Date();
-    const diff = Math.floor((now - d) / 3600000);
-    if (diff < 1) return 'Just now';
-    if (diff < 24) return diff + 'h ago';
-    if (diff < 168) return Math.floor(diff/24) + 'd ago';
+    const diffHours = Math.floor((now.getTime() - d.getTime()) / 3600000);
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffHours < 168) return `${Math.floor(diffHours / 24)}d ago`;
     return d.toLocaleDateString();
   };
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       <div>
-        <h1 className='text-2xl font-bold'>Dashboard</h1>
-        <p className='text-sm text-gray-500'>Welcome back.</p>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-sm text-gray-500">Welcome back.</p>
       </div>
 
-      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           <>
             <StatCardSkeleton />
@@ -69,59 +90,103 @@ export default function Dashboard() {
           </>
         ) : stats ? (
           <>
-                   <StatCard title='Overdue Payments' value={stats.overdue} icon={AlertTriangle} />
-            <StatCard title='Next Due Date' value={formatDate(stats.nextDueDate)} icon={Calendar} />
-            <StatCard title='Total Revenue' value={$} icon={DollarSign} />
+            <StatCard
+              title="Overdue Payments"
+              value={String(stats.overdue ?? '0')}
+              icon={AlertTriangle}
+            />
+            <StatCard
+              title="Next Due Date"
+              value={formatDate(stats.nextDueDate ?? null)}
+              icon={Calendar}
+            />
+            <StatCard
+              title="Total Revenue"
+              value={
+                stats.totalRevenue != null ? String(stats.totalRevenue) : 'N/A'
+              }
+              icon={DollarSign}
+            />
           </>
         ) : null}
       </div>
 
-      <div className='grid gap-6 lg:grid-cols-3'>
-        <div className='lg:col-span-2'>
-          <div className='rounded-lg border bg-white'>
-            <div className='flex items-center justify-between p-4 border-b'>
-              <div className='flex items-center gap-2'>
-                <Activity className='h-5 w-5 text-teal-600' />
-                <h2 className='font-semibold'>Recent Activity</h2>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <div className="rounded-lg border bg-white">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-teal-600" />
+                <h2 className="font-semibold">Recent Activity</h2>
               </div>
-              <Link to='/payments' className='text-sm text-teal-600 flex items-center gap-1'>
-                View all <ArrowRight className='h-4 w-4' />
+              <Link
+                to="/payments"
+                className="text-sm text-teal-600 flex items-center gap-1"
+              >
+                View all <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
 
             <div>
               {isLoading ? (
-                [...Array(5)].map((_,i)=>(
-                  <div key={i} className='flex gap-3 p-4'><div className='h-10 w-10 bg-gray-200 rounded-full'></div><div className='flex-1'><div className='h-4 bg-gray-200 w-3/4 mb-2'></div><div className='h-3 bg-gray-200 w-1/4'></div></div></div>
+                [...Array(5)].map((_, i) => (
+                  <div key={i} className="flex gap-3 p-4">
+                    <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 w-1/4"></div>
+                    </div>
+                  </div>
                 ))
               ) : activities.length === 0 ? (
-                <div className='p-8 text-center text-gray-500'>No recent activity</div>
-              ) : activities.map(a=>(
-                <div key={a.id} className='flex gap-3 p-4'>
-                  <div className='h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center'></div>
-                  <div className='flex-1'>
-                    <p className='text-sm'>{a.message}</p>
-                    <p className='text-xs text-gray-500 mt-1'>{formatTime(a.timestamp)}</p>
-                  </div>
+                <div className="p-8 text-center text-gray-500">
+                  No recent activity
                 </div>
-              ))}
+              ) : (
+                activities.map((a) => (
+                  <div key={a.id} className="flex gap-3 p-4">
+                    <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center"></div>
+                    <div className="flex-1">
+                      <p className="text-sm">{a.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatTime(a.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
         <div>
-          <div className='rounded-lg border bg-white p-4'>
-            <h2 className='font-semibold mb-3'>Quick Actions</h2>
+          <div className="rounded-lg border bg-white p-4">
+            <h2 className="font-semibold mb-3">Quick Actions</h2>
 
-            <div className='space-y-3'>
-              {(role==='LANDLORD' || role==='ADMIN') && (
-                <button onClick={()=>nav('/onboarding')} className='w-full text-left p-3 border rounded hover:bg-gray-50'>Add Tenant</button>
+            <div className="space-y-3">
+              {(role === 'LANDLORD' || role === 'ADMIN') && (
+                <button
+                  onClick={() => nav('/onboarding')}
+                  className="w-full text-left p-3 border rounded hover:bg-gray-50"
+                >
+                  Add Tenant
+                </button>
               )}
 
-              <button onClick={()=>nav('/upload')} className='w-full text-left p-3 border rounded hover:bg-gray-50'>Upload Form</button>
+              <button
+                onClick={() => nav('/upload')}
+                className="w-full text-left p-3 border rounded hover:bg-gray-50"
+              >
+                Upload Form
+              </button>
 
-              {(role==='LANDLORD' || role==='ADMIN') && (
-                <button onClick={()=>nav('/properties/new')} className='w-full text-left p-3 border rounded hover:bg-gray-50'>Add Property</button>
+              {(role === 'LANDLORD' || role === 'ADMIN') && (
+                <button
+                  onClick={() => nav('/properties/new')}
+                  className="w-full text-left p-3 border rounded hover:bg-gray-50"
+                >
+                  Add Property
+                </button>
               )}
             </div>
           </div>

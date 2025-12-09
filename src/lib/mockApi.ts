@@ -1,4 +1,5 @@
-﻿/* src/lib/mockApi.ts - patched */
+﻿/* src/lib/mockApi.ts - corrected (no PowerShell interpolation) */
+
 import {
   demoUser,
   mockUsers,
@@ -13,7 +14,7 @@ import {
 const uploadStore = importedUploadStore || new Map();
 const delay = (ms = 500) => new Promise((r) => setTimeout(r, ms));
 const gen = () => Math.random().toString(36).substring(2, 9);
-const maketoken = (role = 'ADMIN') => ${role.toLowerCase()}-token-;
+const maketoken = (role = 'ADMIN') => `${role.toLowerCase()}-token-${gen()}`;
 const roleForEmail = (e) => {
   e = (e || '').toLowerCase();
   if (e === 'landlord@renttrack.local') return 'LANDLORD';
@@ -165,7 +166,7 @@ export const mockApi = {
   async exportTenantsCSV() {
     await delay(300);
     const header = ['Name', 'Email', 'Phone', 'Property', 'Rent', 'Status'];
-    const rows = mockTenants.map((t) => [t.name, t.email, t.phone, t.propertyName || '', String(t.rentAmount || ''), t.status || ''].map((cell) => "").join(','));
+    const rows = mockTenants.map((t) => [t.name, t.email, t.phone, t.propertyName || '', String(t.rentAmount || ''), t.status || ''].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','));
     const csv = header.join(',') + '\n' + rows.join('\n');
     return new Blob([csv], { type: 'text/csv' });
   },
@@ -173,7 +174,7 @@ export const mockApi = {
   async exportPaymentsCSV() {
     await delay(300);
     const header = ['Tenant', 'Month', 'Amount', 'Due Date', 'Status', 'Paid Date'];
-    const rows = mockPayments.map((p) => [p.tenantName, p.month, String(p.amount), p.dueDate, p.status, p.paidDate || ''].map((cell) => "").join(','));
+    const rows = mockPayments.map((p) => [p.tenantName, p.month, String(p.amount), p.dueDate, p.status, p.paidDate || ''].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','));
     const csv = header.join(',') + '\n' + rows.join('\n');
     return new Blob([csv], { type: 'text/csv' });
   },
