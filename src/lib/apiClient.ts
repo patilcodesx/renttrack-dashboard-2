@@ -1,208 +1,122 @@
-// src/lib/apiClient.ts
 import { mockApi } from './mockApi';
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 export const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080/api';
 
-type Json = any;
-
-function getAuthToken(): string | null {
-  try {
-    return localStorage.getItem('token');
-  } catch (e) {
-    return null;
-  }
+function getAuthHeader() {
+  const token = localStorage.getItem('rt_token') || localStorage.getItem('renttrack_token') || localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request(
-  path: string,
-  opts: RequestInit = {},
-  expectJson = true
-): Promise<any> {
-  const url = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-  const headers: Record<string, string> = {
-    ...(opts.headers as Record<string, string> || {}),
-  };
-
-  // If body is plain object and no Content-Type set, assume JSON
-  if (
-    opts.body &&
-    !(opts.body instanceof FormData) &&
-    !(opts.body instanceof Blob) &&
-    !headers['Content-Type']
-  ) {
-    headers['Content-Type'] = 'application/json';
-    // if body is object, stringify
-    if (typeof opts.body !== 'string') {
-      opts.body = JSON.stringify(opts.body);
-    }
-  }
-
-  const token = getAuthToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const finalOpts: RequestInit = {
-    ...opts,
-    headers,
-  };
-
-  const res = await fetch(url, finalOpts);
-
+async function handleResponse(res: Response) {
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const body = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
   if (!res.ok) {
-    // try to parse error body
-    let errBody: any = null;
-    try {
-      errBody = await res.json();
-    } catch {
-      errBody = await res.text();
-    }
-    const err: any = new Error(
-      `HTTP ${res.status} ${res.statusText} - ${JSON.stringify(errBody)}`
-    );
+    const err = new Error(body?.error || body?.message || res.statusText || 'Request failed');
+    // @ts-ignore
     err.status = res.status;
-    err.body = errBody;
+    // @ts-ignore
+    err.body = body;
     throw err;
   }
-
-  if (!expectJson) return res;
-  // attempt JSON parse
-  const txt = await res.text();
-  if (!txt) return null;
-  try {
-    return JSON.parse(txt);
-  } catch {
-    // return raw text if not JSON
-    return txt;
-  }
+  return body;
 }
-
-/* ------------------------
-   API implementation
-   ------------------------ */
 
 const clientImpl = {
   // Auth
   async login(email: string, password: string) {
     if (USE_MOCK) return mockApi.login(email, password);
-    return request('/auth/login', {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      body: { email, password },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
+    const data = await handleResponse(res);
+    // store token locally for subsequent calls
+    if (data?.token) {
+      localStorage.setItem('rt_token', data.token);
+      localStorage.setItem('renttrack_token', data.token);
+    }
+    return data;
   },
 
-  async forgotPassword(email: string) {
-    if (USE_MOCK) return mockApi.forgotPassword(email);
-    return request('/auth/forgot', {
-      method: 'POST',
-      body: { email },
-    });
+  async logout() {
+    if (USE_MOCK) return mockApi.logout();
+    localStorage.removeItem('rt_token');
+    localStorage.removeItem('renttrack_token');
+    return { ok: true };
   },
 
+  // Users / profile
   async getCurrentUser() {
     if (USE_MOCK) return mockApi.getCurrentUser();
-    return request('/auth/me');
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: { ...getAuthHeader() },
+    });
+    return handleResponse(res);
   },
 
-  // Uploads (multipart)
+  // Uploads
   async uploadFile(file: File) {
     if (USE_MOCK) return mockApi.uploadFile(file);
-    const fd = new FormData();
-    fd.append('file', file);
-    // expect JSON response
-    return request('/uploads', {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_BASE_URL}/uploads`, {
       method: 'POST',
-      body: fd,
+      body: form,
+      headers: { ...getAuthHeader() },
     });
+    return handleResponse(res);
   },
 
   async getUploadParsed(id: string) {
     if (USE_MOCK) return mockApi.getUploadParsed(id);
-    return request(`/uploads/${encodeURIComponent(id)}/parsed`);
+    const res = await fetch(`${API_BASE_URL}/uploads/${id}/parsed`, {
+      headers: { ...getAuthHeader() },
+    });
+    return handleResponse(res);
   },
 
   // Tenants
   async getTenants() {
     if (USE_MOCK) return mockApi.getTenants();
-    return request('/tenants');
+    const res = await fetch(`${API_BASE_URL}/tenants`, {
+      headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+    });
+    return handleResponse(res);
   },
+
   async getTenant(id: string) {
     if (USE_MOCK) return mockApi.getTenant(id);
-    return request(`/tenants/${encodeURIComponent(id)}`);
+    const res = await fetch(`${API_BASE_URL}/tenants/${id}`, {
+      headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+    });
+    return handleResponse(res);
   },
+
   async createTenant(data: any) {
     if (USE_MOCK) return mockApi.createTenant(data);
-    return request('/tenants', {
+    const res = await fetch(`${API_BASE_URL}/tenants`, {
       method: 'POST',
-      body: data,
+      headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
-  },
-
-  // Properties
-  async getProperties() {
-    if (USE_MOCK) return mockApi.getProperties();
-    return request('/properties');
-  },
-  async getProperty(id: string) {
-    if (USE_MOCK) return mockApi.getProperty(id);
-    return request(`/properties/${encodeURIComponent(id)}`);
-  },
-  async createProperty(data: any) {
-    if (USE_MOCK) return mockApi.createProperty(data);
-    return request('/properties', { method: 'POST', body: data });
-  },
-
-  // Payments
-  async getPayments() {
-    if (USE_MOCK) return mockApi.getPayments();
-    return request('/payments');
-  },
-  async markPaymentPaid(id: string, data: any) {
-    if (USE_MOCK) return mockApi.markPaymentPaid(id, data);
-    return request(`/payments/${encodeURIComponent(id)}/mark-paid`, {
-      method: 'POST',
-      body: data,
-    });
-  },
-  async recordManualPayment(data: any) {
-    if (USE_MOCK) return mockApi.recordManualPayment(data);
-    return request('/payments/manual', { method: 'POST', body: data });
+    return handleResponse(res);
   },
 
   // Dashboard
   async getDashboardStats() {
     if (USE_MOCK) return mockApi.getDashboardStats();
-    return request('/dashboard/stats');
+    const res = await fetch(`${API_BASE_URL}/dashboard/stats`, { headers: getAuthHeader() });
+    return handleResponse(res);
   },
+  
   async getRecentActivity() {
     if (USE_MOCK) return mockApi.getRecentActivity();
-    return request('/dashboard/activity');
-  },
-
-  // Users & Settings
-  async getUsers() {
-    if (USE_MOCK) return mockApi.getUsers();
-    return request('/admin/users');
-  },
-  async getSettings() {
-    if (USE_MOCK) return mockApi.getSettings();
-    return request('/admin/settings');
-  },
-  async updateSettings(data: any) {
-    if (USE_MOCK) return mockApi.updateSettings(data);
-    return request('/admin/settings', { method: 'PUT', body: data });
-  },
-
-  // Exports (return Blob)
-  async exportTenantsCSV() {
-    if (USE_MOCK) return mockApi.exportTenantsCSV();
-    const res = await request('/admin/export/tenants', { method: 'GET' }, false);
-    return res.blob ? res.blob() : Promise.resolve(null);
-  },
-  async exportPaymentsCSV() {
-    if (USE_MOCK) return mockApi.exportPaymentsCSV();
-    const res = await request('/admin/export/payments', { method: 'GET' }, false);
-    return res.blob ? res.blob() : Promise.resolve(null);
+    const res = await fetch(`${API_BASE_URL}/dashboard/activity`, { headers: getAuthHeader() });
+    return handleResponse(res);
   },
 };
 

@@ -4,6 +4,7 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputField } from '@/components/ui/InputField';
 import { toast } from '@/components/ui/AppToast';
+import { setAuth } from '@/lib/auth'; // Add this import
 
 export default function Login() {
   const navigate = useNavigate();
@@ -42,11 +43,19 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const response = await login(email, password);
+      
+      // Store auth data in localStorage
+      setAuth(response.user, response.token);
+      
       toast.success('Welcome back!', 'You have been signed in successfully.');
       navigate('/dashboard');
-    } catch (error) {
-      toast.error('Sign in failed', 'Invalid email or password. Try demo@renttrack.local / demo123');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(
+        'Sign in failed',
+        error?.message || 'Invalid email or password. Try demo@renttrack.local / demo123'
+      );
     } finally {
       setIsLoading(false);
     }
